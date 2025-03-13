@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+
+{% block title %}Fridge Monitor Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="display-5">
+            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+        </h1>
+        <p class="lead text-muted">Monitoring {{ fridge_data|length }} fridges</p>
+    </div>
+</div>
+
+{% if fridge_data %}
+    <div class="row">
+        {% for data in fridge_data %}
+            <div class="col-md-6 mb-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-snowflake me-2"></i>{{ data.fridge.name }}
+                        </h5>
+                        {% if data.door_open %}
+                            <span class="badge bg-warning">Door Open</span>
+                        {% else %}
+                            <span class="badge bg-success">Door Closed</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <!-- Current temperature status -->
+                            <div class="col-6">
+                                <div class="d-flex align-items-center">
+                                    <div class="temperature-display p-3 rounded-circle me-3 
+                                        {% if data.current_reading and data.current_reading.temperature > data.fridge.max_temp_threshold %}
+                                            bg-danger
+                                        {% elif data.current_reading and data.current_reading.temperature < data.fridge.min_temp_threshold %}
+                                            bg-info
+                                        {% else %}
+                                            bg-success
+                                        {% endif %}">
+                                        <i class="fas fa-thermometer-half fa-2x text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h2 class="mb-0">
+                                            {% if data.current_reading %}
+                                                {{ "%.1f"|format(data.current_reading.temperature) }}°C
+                                            {% else %}
+                                                --°C
+                                            {% endif %}
+                                        </h2>
+                                        <small class="text-muted">
+                                            Target: {{ "%.1f"|format(data.fridge.target_temp) }}°C
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Current humidity status -->
+                            <div class="col-6">
+                                <div class="d-flex align-items-center">
+                                    <div class="humidity-display p-3 rounded-circle me-3 bg-primary">
+                                        <i class="fas fa-tint fa-2x text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h2 class="mb-0">
+                                            {% if data.current_reading %}
+                                                {{ "%.1f"|format(data.current_reading.humidity) }}%
+                                            {% else %}
+                                                --%
+                                            {% endif %}
+                                        </h2>
+                                        <small class="text-muted">Humidity</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Daily stats -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <h6 class="text-uppercase text-muted mb-3">Today's Statistics</h6>
+                            </div>
+                            <div class="col-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center py-2">
+                                        <h3 class="mb-0">{{ data.stats.door_open_count or 0 }}</h3>
+                                        <small class="text-muted">Door Opens</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center py-2">
+                                        <h3 class="mb-0">
+                                            {% if data.stats.avg_temp %}
+                                                {{ data.stats.avg_temp }}°C
+                                            {% else %}
+                                                --
+                                            {% endif %}
+                                        </h3>
+                                        <small class="text-muted">Avg Temp</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center py-2">
+                                        <h3 class="mb-0">
+                                            {% if data.stats.avg_recovery_time %}
+                                                {{ data.stats.avg_recovery_time }}s
+                                            {% else %}
+                                                --
+                                            {% endif %}
+                                        </h3>
+                                        <small class="text-muted">Recovery</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Compressor status -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <i class="fas fa-cogs fa-lg {% if data.fridge.compressor_status %}text-success{% else %}text-muted{% endif %}"></i>
+                                    </div>
+                                    <div>
+                                        <p class="mb-0">
+                                            Compressor: 
+                                            <span class="badge {% if data.fridge.compressor_status %}bg-success{% else %}bg-secondary{% endif %}">
+                                                {% if data.fridge.compressor_status %}Running{% else %}Idle{% endif %}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Maintenance status -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <i class="fas fa-tools fa-lg {% if data.days_until_maintenance <= 0 %}text-warning{% else %}text-muted{% endif %}"></i>
+                                    </div>
+                                    <div>
+                                        <p class="mb-0">
+                                            Maintenance: 
+                                            {% if data.days_until_maintenance <= 0 %}
+                                                <span class="badge bg-warning">Due Now</span>
+                                            {% else %}
+                                                <span class="badge bg-info">{{ data.days_until_maintenance }} days</span>
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Alerts -->
+                        {% if data.active_alerts %}
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <h6 class="text-uppercase text-muted mb-2">Active Alerts</h6>
+                                    <div class="alert-list">
+                                        {% for alert in data.active_alerts[:3] %}
+                                            <div class="alert alert-warning mb-2 p-2 d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <i class="fas 
+                                                        {% if alert.alert_type == 'door_open' %}
+                                                            fa-door-open
+                                                        {% elif alert.alert_type == 'temp_high' or alert.alert_type == 'temp_low' %}
+                                                            fa-thermometer-half
+                                                        {% elif alert.alert_type == 'maintenance_due' %}
+                                                            fa-tools
+                                                        {% elif alert.alert_type == 'defrosting' %}
+                                                            fa-snowflake
+                                                        {% else %}
+                                                            fa-exclamation-triangle
+                                                        {% endif %}
+                                                    me-2"></i>
+                                                    {{ alert.message }}
+                                                </div>
+                                                <a href="{{ url_for('acknowledge_alert_route', alert_id=alert.id) }}" class="btn btn-sm btn-outline-dark">
+                                                    <i class="fas fa-check"></i>
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                        
+                                        {% if data.active_alerts|length > 3 %}
+                                            <div class="text-center">
+                                                <small>
+                                                    <a href="{{ url_for('fridge_detail', fridge_id=data.fridge.id) }}">
+                                                        View {{ data.active_alerts|length - 3 }} more alerts
+                                                    </a>
+                                                </small>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="card-footer bg-transparent border-0">
+                        <a href="{{ url_for('fridge_detail', fridge_id=data.fridge.id) }}" class="btn btn-outline-primary btn-sm w-100">
+                            <i class="fas fa-chart-line me-1"></i> View Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i> No fridges configured. Please check the settings.
+    </div>
+{% endif %}
+{% endblock %}

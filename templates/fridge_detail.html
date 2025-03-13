@@ -1,0 +1,441 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ fridge.name }} - Details{% endblock %}
+
+{% block extra_head %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="display-5">
+            <i class="fas fa-snowflake me-2"></i>{{ fridge.name }}
+        </h1>
+        <p class="lead text-muted">{{ fridge.description }}</p>
+    </div>
+    <div>
+        <a href="/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Current status -->
+    <div class="col-md-4 mb-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Current Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="status-indicator p-3 rounded-circle me-3 
+                            {% if door_open %}
+                                bg-warning
+                            {% else %}
+                                bg-success
+                            {% endif %}">
+                            <i class="fas {% if door_open %}fa-door-open{% else %}fa-door-closed{% endif %} fa-2x text-white"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0">Door {% if door_open %}Open{% else %}Closed{% endif %}</h4>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="status-indicator p-3 rounded-circle me-3 
+                            {% if current_reading and current_reading.temperature > fridge.max_temp_threshold %}
+                                bg-danger
+                            {% elif current_reading and current_reading.temperature < fridge.min_temp_threshold %}
+                                bg-info
+                            {% else %}
+                                bg-success
+                            {% endif %}">
+                            <i class="fas fa-thermometer-half fa-2x text-white"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0">
+                                {% if current_reading %}
+                                    {{ "%.1f"|format(current_reading.temperature) }}°C
+                                {% else %}
+                                    --°C
+                                {% endif %}
+                            </h4>
+                            <small class="text-muted">
+                                Target: {{ "%.1f"|format(fridge.target_temp) }}°C ({{ "%.1f"|format(fridge.min_temp_threshold) }}°C - {{ "%.1f"|format(fridge.max_temp_threshold) }}°C)
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="status-indicator p-3 rounded-circle me-3 bg-primary">
+                            <i class="fas fa-tint fa-2x text-white"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0">
+                                {% if current_reading %}
+                                    {{ "%.1f"|format(current_reading.humidity) }}%
+                                {% else %}
+                                    --%
+                                {% endif %}
+                            </h4>
+                            <small class="text-muted">Humidity</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-items-center mb-3">
+                    <div class="me-3">
+                        <i class="fas fa-cogs fa-lg {% if fridge.compressor_status %}text-success{% else %}text-muted{% endif %}"></i>
+                    </div>
+                    <div>
+                        <p class="mb-0">
+                            Compressor: 
+                            <span class="badge {% if fridge.compressor_status %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if fridge.compressor_status %}Running{% else %}Idle{% endif %}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas fa-tools fa-lg {% if fridge.days_until_maintenance() <= 0 %}text-warning{% else %}text-muted{% endif %}"></i>
+                    </div>
+                    <div>
+                        <p class="mb-0">
+                            Maintenance: 
+                            {% if fridge.days_until_maintenance() <= 0 %}
+                                <span class="badge bg-warning">Due Now</span>
+                            {% else %}
+                                <span class="badge bg-info">{{ fridge.days_until_maintenance() }} days</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Daily statistics -->
+    <div class="col-md-8 mb-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Daily Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center py-3">
+                                <div class="display-4">{{ stats.door_open_count or 0 }}</div>
+                                <div class="text-muted">Door Openings</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center py-3">
+                                <div class="display-4">
+                                    {% if stats.avg_temp %}
+                                        {{ stats.avg_temp }}°C
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </div>
+                                <div class="text-muted">Average Temp</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center py-3">
+                                <div class="display-4">
+                                    {% if stats.avg_humidity %}
+                                        {{ stats.avg_humidity }}%
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </div>
+                                <div class="text-muted">Average Humidity</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center py-3">
+                                <div class="display-4">
+                                    {% if recovery_time %}
+                                        {{ '%d'|format(recovery_time) }}s
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </div>
+                                <div class="text-muted">Last Recovery Time</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center py-3">
+                                <div class="display-4">
+                                    {% if stats.avg_recovery_time %}
+                                        {{ stats.avg_recovery_time }}s
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </div>
+                                <div class="text-muted">Average Recovery</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Temperature Chart -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Temperature & Humidity</h5>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('fridge_detail', fridge_id=fridge.id, duration=1) }}" class="btn btn-sm {% if duration == 1 %}btn-light{% else %}btn-outline-light{% endif %}">24h</a>
+                    <a href="{{ url_for('fridge_detail', fridge_id=fridge.id, duration=7) }}" class="btn btn-sm {% if duration == 7 %}btn-light{% else %}btn-outline-light{% endif %}">7d</a>
+                    <a href="{{ url_for('fridge_detail', fridge_id=fridge.id, duration=30) }}" class="btn btn-sm {% if duration == 30 %}btn-light{% else %}btn-outline-light{% endif %}">30d</a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="temperatureChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alerts and Maintenance -->
+<div class="row">
+    <!-- Active Alerts -->
+    <div class="col-md-6 mb-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Active Alerts</h5>
+            </div>
+            <div class="card-body">
+                {% if active_alerts %}
+                    <div class="alert-list">
+                        {% for alert in active_alerts %}
+                            <div class="alert alert-warning d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas 
+                                        {% if alert.alert_type == 'door_open' %}
+                                            fa-door-open
+                                        {% elif alert.alert_type == 'temp_high' or alert.alert_type == 'temp_low' %}
+                                            fa-thermometer-half
+                                        {% elif alert.alert_type == 'maintenance_due' %}
+                                            fa-tools
+                                        {% elif alert.alert_type == 'defrosting' %}
+                                            fa-snowflake
+                                        {% else %}
+                                            fa-exclamation-triangle
+                                        {% endif %}
+                                    me-2"></i>
+                                    <strong>{{ alert.timestamp.strftime('%H:%M:%S') }}</strong> - {{ alert.message }}
+                                </div>
+                                <a href="{{ url_for('acknowledge_alert_route', alert_id=alert.id) }}" class="btn btn-sm btn-outline-dark">
+                                    <i class="fas fa-check"></i>
+                                </a>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-check-circle fa-4x mb-3"></i>
+                        <h5>No active alerts</h5>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Maintenance -->
+    <div class="col-md-6 mb-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Maintenance</h5>
+            </div>
+            <div class="card-body">
+                {% if fridge.days_until_maintenance() <= 0 %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-tools me-2"></i>Maintenance is overdue
+                    </div>
+                    
+                    <form action="{{ url_for('log_maintenance_route', fridge_id=fridge.id) }}" method="post" class="mb-4">
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Maintenance Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="performed_by" class="form-label">Performed By</label>
+                            <input type="text" class="form-control" id="performed_by" name="performed_by" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check me-1"></i> Log Maintenance
+                        </button>
+                    </form>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-calendar-alt me-2"></i>Next maintenance due in {{ fridge.days_until_maintenance() }} days
+                    </div>
+                {% endif %}
+                
+                <h6 class="mt-4 mb-3">Maintenance History</h6>
+                {% if maintenance_history %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Performed By</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in maintenance_history %}
+                                    <tr>
+                                        <td>{{ record.maintenance_date.strftime('%Y-%m-%d') }}</td>
+                                        <td>{{ record.performed_by }}</td>
+                                        <td>{{ record.description }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No maintenance records found.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/chart_handler.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Temperature data
+    const timestamps = {{ temp_data.timestamps|tojson }};
+    const temperatures = {{ temp_data.temperatures|tojson }};
+    const humidities = {{ temp_data.humidities|tojson }};
+    
+    // Target temperature
+    const targetTemp = {{ fridge.target_temp }};
+    const minThreshold = {{ fridge.min_temp_threshold }};
+    const maxThreshold = {{ fridge.max_temp_threshold }};
+    
+    // Create temperature chart
+    createTemperatureChart('temperatureChart', timestamps, temperatures, humidities, targetTemp, minThreshold, maxThreshold);
+    
+    // Auto-refresh data every 60 seconds
+    setInterval(function() {
+        fetch(`/api/stats/{{ fridge.id }}`)
+            .then(response => response.json())
+            .then(data => {
+                // Update current temperature and humidity
+                const tempElement = document.querySelector('.fa-thermometer-half').parentNode.nextElementSibling.querySelector('h4');
+                if (data.current_temp !== null) {
+                    tempElement.textContent = `${data.current_temp}°C`;
+                }
+                
+                const humidityElement = document.querySelector('.fa-tint').parentNode.nextElementSibling.querySelector('h4');
+                if (data.current_humidity !== null) {
+                    humidityElement.textContent = `${data.current_humidity}%`;
+                }
+                
+                // Update door status
+                const doorIcon = document.querySelector('.fa-door-open, .fa-door-closed');
+                const doorText = doorIcon.parentNode.nextElementSibling.querySelector('h4');
+                if (data.door_open) {
+                    doorIcon.classList.remove('fa-door-closed');
+                    doorIcon.classList.add('fa-door-open');
+                    doorText.textContent = 'Door Open';
+                    doorIcon.parentNode.classList.remove('bg-success');
+                    doorIcon.parentNode.classList.add('bg-warning');
+                } else {
+                    doorIcon.classList.remove('fa-door-open');
+                    doorIcon.classList.add('fa-door-closed');
+                    doorText.textContent = 'Door Closed';
+                    doorIcon.parentNode.classList.remove('bg-warning');
+                    doorIcon.parentNode.classList.add('bg-success');
+                }
+                
+                // Update compressor status
+                const compressorBadge = document.querySelector('p:contains("Compressor") .badge');
+                if (data.compressor_status) {
+                    compressorBadge.textContent = 'Running';
+                    compressorBadge.classList.remove('bg-secondary');
+                    compressorBadge.classList.add('bg-success');
+                } else {
+                    compressorBadge.textContent = 'Idle';
+                    compressorBadge.classList.remove('bg-success');
+                    compressorBadge.classList.add('bg-secondary');
+                }
+            });
+            
+        // Check for new alerts
+        fetch(`/api/alerts/{{ fridge.id }}`)
+            .then(response => response.json())
+            .then(alerts => {
+                const alertList = document.querySelector('.alert-list');
+                if (alertList) {
+                    if (alerts.length === 0) {
+                        alertList.innerHTML = `
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-check-circle fa-4x mb-3"></i>
+                                <h5>No active alerts</h5>
+                            </div>
+                        `;
+                    } else {
+                        let alertHtml = '';
+                        alerts.forEach(alert => {
+                            let iconClass = 'fa-exclamation-triangle';
+                            if (alert.type === 'door_open') iconClass = 'fa-door-open';
+                            else if (alert.type === 'temp_high' || alert.type === 'temp_low') iconClass = 'fa-thermometer-half';
+                            else if (alert.type === 'maintenance_due') iconClass = 'fa-tools';
+                            else if (alert.type === 'defrosting') iconClass = 'fa-snowflake';
+                            
+                            alertHtml += `
+                                <div class="alert alert-warning d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas ${iconClass} me-2"></i>
+                                        <strong>${alert.timestamp.split(' ')[1]}</strong> - ${alert.message}
+                                    </div>
+                                    <a href="/acknowledge_alert/${alert.id}" class="btn btn-sm btn-outline-dark">
+                                        <i class="fas fa-check"></i>
+                                    </a>
+                                </div>
+                            `;
+                        });
+                        alertList.innerHTML = alertHtml;
+                    }
+                }
+            });
+    }, 60000);
+});
+</script>
+{% endblock %}

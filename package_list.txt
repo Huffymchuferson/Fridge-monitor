@@ -1,0 +1,9 @@
+adafruit-circuitpython-dht==3.7.8
+APScheduler==3.10.1
+email-validator==2.0.0
+Flask==2.3.3
+Flask-SQLAlchemy==3.1.1
+gunicorn==23.0.0
+psycopg2-binary==2.9.7
+RPi.GPIO==0.7.1
+SQLAlchemy==2.0.20
